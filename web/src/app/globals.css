@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --cream: #F3EEE2;
+  --cream-lo: #EDE7D8;
+  --cream-hi: #FBF8F1;
+  --ink: #1E2418;
+  --muted: #6B6A5C;
+  --border: rgba(30, 36, 24, 0.12);
+  --gold: oklch(0.78 0.15 78);
+  --gold-d: oklch(0.62 0.14 70);
+  --green: oklch(0.5 0.1 140);
+  --rust: oklch(0.56 0.14 40);
+}
+
+@theme inline {
+  --color-background: var(--cream);
+  --color-foreground: var(--ink);
+  --font-sans: var(--font-hanken);
+  --font-mono: var(--font-jbmono);
+}
+
+html, body {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-hanken), Helvetica, sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+}
+
+@keyframes mzSway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes mzShine {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 660px; }
+}
+
+@keyframes mzPlot {
+  0%, 100% { opacity: .35; }
+  50% { opacity: .9; }
+}
+
+@keyframes mzHelixA {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(0, 40px); }
+}
+
+@keyframes mzHelixB {
+  0% { transform: translate(0, 40px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes mzBar {
+  0% { transform: scaleY(0.85); }
+  100% { transform: scaleY(1); }
+}
+
+@keyframes mzGlobeSpin {
+  from { background-position: 0 0; }
+  to { background-position: -200px 0; }
+}
+
+@keyframes mzOrbitSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mzOrbitCounterSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes mzPop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}

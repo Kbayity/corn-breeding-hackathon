@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node / web (web/ app)
+web/node_modules/
+web/.next/
+web/*.tsbuildinfo
+web/next-env.d.ts
+

@@ -24,39 +24,122 @@ Therefore we must rank candidate lines genomically before allocating field resou
 *(Breeding decision context, stakeholder impact, commercial significance — see above)*
 
 ### 2. Solution Overview
-*(Data integration workflow + prediction approach)*
 
+One pipeline, raw hackathon files to advancement decision:
 
+```
+RAW FILES ──► outlier removal + within-family deviation + family effect (stage 1)
+                            │                              │
+                            ▼                              ▼
+                   family/line tables            HMM-imputed line genotypes (2,911 SNPs)
+                            │                              │
+        ┌───────────────────┼──────────────────────────────┘
+        ▼                   ▼
+ FAMILY MODELS      WITHIN-FAMILY MODEL
+ pedigree ridge +   rrBLUP on markers → D
+ parent-DNA ridge → F, T
+        └─────────┬─────────┘
+                   ▼
+      LINE SCORE: testcross = F+T+D, GCA = F+D, SD, confidence tier
+                   ▼
+      ALLOCATION: 15% of plots, tilt τ=0.5, advance top 5% at harvest
+                   ▼
+      OUTPUT: advancement list + written reason per line
+
+PUBLIC DATA (NASA POWER weather, SSURGO soil, USDA NASS county yields)
+      ──► site-yield forecast + simulator (site choice, risk — not line ranking)
+```
+
+Two runnable packages implement this: `pipeline/` (raw data → decision, ~17 min; judge mode ~2 min on a bundled sample) and `app/` (a Streamlit advisor app that ships with precomputed, forward-validated predictions and needs no raw data to run). `web/` is a standalone pitch website built on the real sealed 2008 decision — see [Run Instructions](#5-run-instructions).
 
 ### 3. Technical Approach
-*(Baseline models + our methodology; preprocessing; model validation)*
 
+- **Family value (F):** two ridge regressions — a pedigree model (family effects on a parent-share matrix + tester indicators) and a parent-DNA model (share-weighted parent marker profiles + tester indicators) — each tuned on seasons < Y−1 and scored on Y−1, averaged and rescaled by a replay-calibrated slope.
+- **Within-family deviation (D):** rrBLUP ridge regression on 2,911 markers per line. Progeny are genotyped at only 49–123 of those markers; a parent-aware HMM (Haldane recombination along the genetic map, 1% genotyping-error rate) imputes the rest, recovering 76% of hidden calls vs. 58%/52% for simpler methods — the single most useful processing step, raising within-family accuracy 18%.
+- **Uncertainty:** SD from replay error grouped by how many parents were seen before, combined with simulated-progeny spread (200 simulated progeny per cross); 80% interval = ±1.28 SD. Confidence tier (high/medium/low) from whether both/one/no parents and the tester were seen before.
+- **Allocation:** each family's plot quota = family size × 15% × a tilt weight (`clip(1 + τ·z, 0, 3)`, τ=0.5, z = standardized predicted family value), rescaled so the total is 15%; inside each family the best-DNA siblings fill the quota.
+- **Validation, strictly forward in time:** train on seasons < Y, predict new families in Y only; a family's lines are never split between train and test; the two gene pools (C1/C2) are modeled separately; every method re-tested on each season 2003–2007. The reported gain replays each family's locations split into a field half (used to select) and a grading half (used to score), 100 bootstrap replicates — so nothing is picked and graded on the same plots.
+- **Baselines beaten:** traditional parents'-field-record selection (line r 0.51/0.46 vs. ours 0.56/0.57; genetic gain 3.75 vs. our 5.42 bu/ac), environmental means, random selection, and planting everything.
 
 ### 4. Results
-*(Prediction accuracy; line ranking; uncertainty quantification)*
 
+*(Full detail in `docs/RESULTS.md` and `docs/FINAL_WRITEUP.md`; headline numbers below are the sealed evaluation.)*
 
+| Measure | Value |
+|---|---|
+| Lines advanced | 2,395 of 15,968 (15% of plots), from 154 of 157 families |
+| Plots used / saved | 12,925 used, 74,361 saved (85%) |
+| Line accuracy (r), C1 / C2 | 0.562 / 0.566 |
+| Family accuracy (r), C1 / C2 | 0.609 / 0.697 |
+| Genetic gain, our plan vs. planting everything | 5.42 vs. 4.74 bu/ac (**+14%**) |
+| Genetic gain vs. traditional parent-record selection | 5.42 vs. 3.75 bu/ac (**+45%**) |
+| Genetic gain per plot vs. planting everything | **7.7×** |
+| Plot cost saved (at $150/plot, assumed) | **~$11M** |
+| Share of the data's own noise ceiling reached | 87% (C1) / 89% (C2) |
+| True top-10% lines caught by our top 10% (random = 10%) | 38% (C1) |
+
+Reproducibility: the app, `predict_report.py`, and the packaged pipeline each reproduce the sealed 2,395-line list exactly. The decision was locked with a SHA-256 hash before the 2008 results were opened, and 2008 was evaluated once.
 
 ### 5. Run Instructions
-*(Clear "judge mode" with sample data subset)*
 
-**Judge Mode — Single Population:**
+**Judge mode** — full pipeline on a bundled sample (well under 2 minutes):
+```bash
+cd pipeline
+MAIZE_DATA="sample_data/Simplified Hackathon Dataset V3" MAIZE_CACHE=cache_judge \
+  MAIZE_OUT=outputs_judge python3 judge_mode.py
+# writes outputs_judge/judge_mode_output.csv
+```
 
+**Full pipeline** (raw data → decision, ~17.4 min): same scripts in `pipeline/`, run against the complete hackathon dataset (not bundled here for size — see the organizers' data drop).
 
+**Demo app** (no raw data needed — ships with precomputed, forward-validated predictions):
+```bash
+cd app
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cd app && streamlit run app.py   # open http://localhost:8501
+```
+
+**Pitch website** (real sealed-decision data, interactive):
+```bash
+cd web
+npm install
+npm run dev   # open http://localhost:3000
+```
+Live: see the deployed link in `web/README.md` if present, or ask the team.
 
 ### 6. Commercial Recommendations
-*(Specific lines to advance, resource allocation strategy)*
 
+Plant the 2,395 lines in `app/final_2008/advancement_list.csv` — 15% of plots, tilt τ=0.5 strategy, frozen from the 2004–07 replay before 2008 was opened. Test every planted line at every location its family goes to (extra locations beat extra lines, ~1.8× the gain at equal cost); at harvest, advance the top 5% on field yield; plan next crosses from the shortlist in `pipeline`'s forecast output.
+
+**Key insight:** don't skip the field trial, shrink it. DNA alone (no field test) delivers only 0.30× the gain of planting everything; using DNA to cut to 15% of lines, then field-testing those, delivers 1.14×.
+
+**Intended users:** breeding program managers (budget/risk level), population development teams (next-cross shortlist), field-testing coordinators (plot/location allocation).
 
 ### 7. Constraints and Limitations
-*(Model failures, data gaps, next development steps)*
 
-
+- **Sibling ranking is weak** (within-family r 0.16–0.20): siblings differ little and are measured on few plots. The family-level call carries the decision.
+- **Intervals run overconfident:** 2008 line 80% intervals covered only 68–73%, not 80%; C1's high-confidence tier covered just 54% (C2 was 76%).
+- **Yield selection drifts wetter:** planted lines are +1.6–1.9 moisture points wetter at harvest (later maturity) — a real drying-cost trade-off with no finished economic index yet.
+- **2008 is the only true out-of-sample test:** one held-out season, and ~40% of its locations hold a single family — thin ground for some of these numbers.
+- **Satellite imagery** helps as a mid-season site/field monitor, not for choosing which lines to plant.
 
 ## Data → Decision Framing
 
+Raw plots, genotypes and pedigree → outlier removal, within-family deviation and family-effect fitting (stage 1) → HMM-imputed line genotypes (2,911 SNPs from 49–123 measured) → family models (pedigree ridge + parent-DNA ridge) and within-family rrBLUP → line score (GCA = F+D, testcross = F+T+D, SD, confidence tier) → tilted budget allocation (15% of plots, τ=0.5) → advancement list with a checkable, written reason per line. Separately, public weather/soil/county data drive a site-yield forecast and simulator used for location choice and risk framing — validated independently, and never used to re-rank which lines to plant (location-specific ranking was tested every forward year and never beat the broad ranking).
 
+## Repository Structure
 
+```
+├── pipeline/    Full raw-data → decision pipeline (judge_mode.py, final_model.py, score_2008.py, ...)
+│                Run judge mode against the bundled pipeline/sample_data/.
+├── app/         Streamlit advisor app — Farmer / Advanced / Analytics panels, precomputed predictions,
+│                no raw hackathon data required. final_2008/advancement_list.csv is the sealed decision.
+├── web/         Next.js pitch website (splash, Farmer/Geneticist/Data-scientist/Story views),
+│                built on the same real sealed 2008 data.
+└── docs/        FINAL_WRITEUP.md (full technical write-up), RESULTS.md (every 2008 number, sealed
+                 and post-hoc), INVENTORY.md.
+```
 
 ## References
 
